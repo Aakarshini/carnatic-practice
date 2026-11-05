@@ -1,0 +1,772 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Swara Sadhana</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Tiro+Tamil&family=Mukta:wght@400;500;700;800&display=swap">
+<style>
+/* Layout: app-style single column. Compact top bar (shruti + tanpura), raga hero with swara tiles, segmented modes, one practice view at a time, docked listening bar */
+:root{
+  --bg:#ECEFF6; --surface:#FFFFFF; --raise:#E2E6F1; --ink:#131A2F; --muted:#5A6283; --line:#D3D8E6;
+  --accent:#E09422; --accent-ink:#1C1204; --accent-text:#94590A; --accent-soft:#FBEBD2;
+  --ok:#17824A; --ok-soft:#D9F2E3; --warn:#A9650B; --warn-soft:#FAEBD0; --bad:#C0342B; --bad-soft:#FADCD8;
+  --f-display:"Tiro Tamil", "Iowan Old Style", Georgia, serif;
+  --f-body:"Mukta", "Segoe UI", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#0C1020; --surface:#151A2D; --raise:#1E2440; --ink:#E8EBF6; --muted:#98A0C0; --line:#283050;
+  --accent:#F2A940; --accent-ink:#1C1204; --accent-text:#F4B95E; --accent-soft:#3A2A12;
+  --ok:#52CC8B; --ok-soft:#12301F; --warn:#EDB04F; --warn-soft:#382A12; --bad:#F37A6F; --bad-soft:#3D1B19; color-scheme:dark }}
+:root[data-theme="dark"]{
+  --bg:#0C1020; --surface:#151A2D; --raise:#1E2440; --ink:#E8EBF6; --muted:#98A0C0; --line:#283050;
+  --accent:#F2A940; --accent-ink:#1C1204; --accent-text:#F4B95E; --accent-soft:#3A2A12;
+  --ok:#52CC8B; --ok-soft:#12301F; --warn:#EDB04F; --warn-soft:#382A12; --bad:#F37A6F; --bad-soft:#3D1B19; color-scheme:dark }
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.45}
+button,select,input{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.app{max-width:760px;margin:0 auto;padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px));padding-block:14px 150px;display:flex;flex-direction:column;gap:16px}
+
+/* top bar */
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.brand{font-family:var(--f-display);font-size:1.15rem;letter-spacing:.02em}
+.brand small{display:block;font-family:var(--f-body);font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.top-right{display:flex;align-items:center;gap:8px}
+.pill{display:flex;align-items:center;gap:6px;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:4px 6px 4px 12px}
+.pill span{font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:700}
+.pill select{border:0;background:transparent;font-weight:700;padding:4px 2px;max-width:150px}
+.tan{width:52px;height:52px;border-radius:50%;border:1px solid var(--line);background:var(--surface);display:grid;place-items:center;padding:0;position:relative}
+.tan.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.tan svg{width:26px;height:26px;overflow:visible}
+.tan line{stroke:currentColor;stroke-width:1.6;stroke-linecap:round;transform-origin:center;transform-box:fill-box}
+.tan line.pluck{animation:vib .5s ease-out}
+@keyframes vib{0%{transform:scaleX(1)}15%{transform:translateX(1.4px)}30%{transform:translateX(-1.2px)}45%{transform:translateX(.9px)}60%{transform:translateX(-.6px)}100%{transform:none}}
+
+/* hero */
+.hero{background:var(--surface);border-radius:20px;padding:18px 18px 16px;display:flex;flex-direction:column;gap:14px;border:1px solid var(--line)}
+.raga-pick{position:relative}
+.raga-pick select{appearance:none;-webkit-appearance:none;width:100%;border:0;background:transparent;font-family:var(--f-display);font-size:2.3rem;line-height:1.1;padding:0 36px 0 0;cursor:pointer}
+.raga-pick::after{content:"";position:absolute;right:6px;top:50%;width:11px;height:11px;border-right:2.5px solid var(--accent-text);border-bottom:2.5px solid var(--accent-text);transform:translateY(-70%) rotate(45deg);pointer-events:none}
+.meta{color:var(--muted);font-size:.92rem;margin-top:-8px}
+.scale-row{display:flex;flex-direction:column;gap:6px}
+.lbl{font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:700}
+.avoid{font-size:.88rem;color:var(--muted)}
+.avoid b{color:var(--bad);font-weight:700}
+
+/* swara tiles */
+.tiles{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center}
+.grp{display:inline-flex;flex-wrap:wrap;gap:4px;max-width:100%}
+.t{position:relative;min-width:44px;height:46px;padding:0 6px;border-radius:12px;background:var(--raise);display:inline-flex;align-items:center;justify-content:center;white-space:nowrap;font-weight:700;font-size:1.12rem;transition:background .15s,color .15s,transform .15s}
+.t.lo::after,.t.hi::before{content:"";position:absolute;left:50%;width:5px;height:5px;border-radius:50%;background:currentColor;transform:translateX(-50%)}
+.t.lo::after{bottom:5px}
+.t.hi::before{top:5px}
+.tiles.sm .t{min-width:38px;height:40px;font-size:1rem;border-radius:10px}
+.t.nyasa{box-shadow:inset 0 0 0 2px var(--accent)}
+.t .kv{margin-left:3px;opacity:.55;letter-spacing:.12em}
+.grp.fast{gap:2px;padding-bottom:5px;border-bottom:2px solid var(--muted)}
+.grp.fast .t{min-width:34px;height:38px;font-size:.98rem;border-radius:9px}
+.pat-head{display:flex;flex-direction:column;gap:2px;margin-bottom:-2px}
+.pat-head h3{margin:0;font-family:var(--f-display);font-weight:400;font-size:1.35rem}
+.pat-head .num{font-size:.75rem;letter-spacing:.12em;color:var(--accent-text);font-weight:800}
+.pat-head p{margin:0;color:var(--muted);font-size:.92rem}
+.pat{display:flex;flex-direction:column;gap:10px}
+.more{border:2px dashed var(--line);background:transparent;border-radius:16px;padding:14px;font-weight:800;color:var(--accent-text)}
+.more:hover{border-color:var(--accent)}
+.stage{display:inline-block;font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;font-weight:800;color:var(--accent-text);margin-bottom:2px}
+.t.st-next{background:var(--accent);color:var(--accent-ink);transform:translateY(-2px)}
+.t.st-ok{background:var(--ok-soft);color:var(--ok)}
+.t.st-off{background:var(--warn-soft);color:var(--warn)}
+.t.st-wrong{background:var(--bad);color:#fff}
+.t.st-miss{background:var(--bad-soft);color:var(--bad);text-decoration:line-through}
+
+/* modes */
+.seg-ctl{display:grid;grid-template-columns:repeat(3,1fr);background:var(--raise);border-radius:14px;padding:4px;gap:4px}
+.seg-ctl button{border:0;background:transparent;border-radius:10px;padding:10px 6px;font-weight:700;color:var(--muted)}
+.seg-ctl button[aria-selected="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.chips{display:flex;gap:8px;overflow-x:auto;padding-bottom:2px;scrollbar-width:none}
+.chip{flex:none;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:7px 14px;font-weight:500;font-size:.95rem;white-space:nowrap}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.intro{margin:0;color:var(--muted);font-size:.95rem}
+
+/* practice cards */
+.card{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:14px 16px;display:flex;flex-direction:column;gap:12px}
+.card.active{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
+.card-head{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.card-head h3{margin:0;font-size:1rem;font-weight:700}
+.card-head .step{font-size:.78rem;color:var(--muted);font-weight:700;letter-spacing:.06em}
+.sing{border:0;border-radius:999px;background:var(--accent);color:var(--accent-ink);font-weight:800;padding:8px 16px;display:inline-flex;align-items:center;gap:7px;flex:none}
+.sing::before{content:"";width:8px;height:8px;border-radius:50%;background:currentColor}
+.card.active .sing{background:var(--ink);color:var(--bg)}
+.card.active .sing::before{border-radius:2px}
+.ghost{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:7px 14px;font-weight:700}
+.result{border-top:1px solid var(--line);padding-top:10px;display:flex;flex-direction:column;gap:6px;font-size:.95rem}
+.result ul{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:2px}
+.score{font-weight:800}
+.score.good{color:var(--ok)} .score.mid{color:var(--warn)} .score.bad{color:var(--bad)}
+.upload{border-top:1px solid var(--line);padding-top:10px;display:flex;flex-direction:column;gap:8px;font-size:.92rem}
+.upload input{max-width:100%}
+
+/* alapana chain */
+.chain{display:flex;flex-direction:column;gap:0}
+.link{display:flex;align-items:center;gap:8px;padding:6px 0 6px 22px;color:var(--muted);font-size:.85rem}
+.link::before{content:"";width:2px;height:22px;background:var(--accent);border-radius:2px}
+.link b{color:var(--accent-text)}
+.bar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+
+/* free */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.stat{background:var(--raise);border-radius:12px;padding:10px}
+.stat b{display:block;font-size:1.35rem;font-variant-numeric:tabular-nums;line-height:1.2}
+.stat span{font-size:.76rem;color:var(--muted)}
+.strip{display:flex;flex-wrap:wrap;gap:6px;min-height:40px}
+.strip .t{min-width:38px;height:36px;font-size:.95rem;background:var(--ok-soft);color:var(--ok)}
+.strip .t.off{background:var(--warn-soft);color:var(--warn)}
+.strip .t.bad{background:var(--bad);color:#fff}
+
+details.settings{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:10px 14px}
+details.settings summary{cursor:pointer;font-weight:700;color:var(--muted);font-size:.92rem}
+.set-grid{display:grid;gap:12px;padding-top:12px}
+.set-row{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.set-row select{border:1px solid var(--line);border-radius:10px;background:var(--bg);padding:6px 10px}
+input[type=range]{accent-color:var(--accent);width:140px}
+input[type=checkbox]{accent-color:var(--accent);width:20px;height:20px}
+.hint{font-size:.85rem;color:var(--muted);margin:0}
+.banner{border-radius:14px;padding:12px 14px;background:var(--warn-soft);font-size:.92rem}
+.banner b{color:var(--warn)}
+
+/* listening bar */
+.monitor{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--ink);color:var(--bg);padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px));padding-top:12px;padding-bottom:calc(14px + env(safe-area-inset-bottom, 0px));border-radius:22px 22px 0 0}
+.mon-in{max-width:760px;margin:0 auto;display:flex;align-items:center;gap:14px}
+.mon-sw{font-family:var(--f-display);font-size:2.5rem;min-width:76px;text-align:center;line-height:1}
+.mon-sw.bad{color:var(--bad)}
+.mon-mid{flex:1;min-width:0;display:flex;flex-direction:column;gap:7px}
+.meter{position:relative;height:22px}
+.meter .ticks{position:absolute;inset:8px 0;border-radius:3px;background:repeating-linear-gradient(90deg,currentColor 0 1px,transparent 1px 10%);opacity:.25}
+.meter .zone{position:absolute;top:4px;bottom:4px;left:35%;right:35%;border-radius:4px;background:var(--ok);opacity:.35}
+.needle{position:absolute;top:0;width:4px;height:22px;border-radius:2px;background:var(--accent);left:50%;transform:translateX(-50%);transition:left .08s linear}
+.mon-txt{font-size:.9rem;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;opacity:.85}
+.mon-stop{border:0;border-radius:999px;background:var(--accent);color:var(--accent-ink);font-weight:800;padding:10px 18px}
+@media (max-width:520px){.raga-pick select{font-size:1.9rem}.stats{grid-template-columns:repeat(2,1fr)}.t{min-width:40px;height:42px;font-size:1.02rem}.pill span{display:none}.mon-sw{font-size:2rem;min-width:60px}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+</head><body>
+<div class="app">
+  <div class="top">
+    <div class="brand">Swara Sadhana<small>Practice companion</small></div>
+    <div class="top-right">
+      <label class="pill" for="shrutiSel"><span>Sa</span><select id="shrutiSel" aria-label="Your shruti"></select></label>
+      <button class="tan" id="tanBtn" type="button" aria-pressed="false" aria-label="Start tanpura" title="Tanpura">
+        <svg viewBox="0 0 26 26" aria-hidden="true"><line id="str0" x1="5" y1="3" x2="5" y2="23"/><line id="str1" x1="10.3" y1="3" x2="10.3" y2="23"/><line id="str2" x1="15.6" y1="3" x2="15.6" y2="23"/><line id="str3" x1="21" y1="3" x2="21" y2="23"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <section class="hero" id="hero">
+    <div class="raga-pick"><select id="ragaSel" aria-label="Raga"></select></div>
+    <div class="meta" id="ragaMeta"></div>
+    <div class="scale-row"><span class="lbl">Arohanam</span><div class="tiles sm" id="aroT"></div></div>
+    <div class="scale-row"><span class="lbl">Avarohanam</span><div class="tiles sm" id="avaT"></div></div>
+    <div class="avoid" id="ragaAvoid"></div>
+  </section>
+
+  <div class="banner" id="micBanner" hidden><b>Microphone is off on this page.</b> Tap Sing, record yourself on your phone and upload it. For live checking, use the student link.</div>
+
+  <div class="seg-ctl" role="tablist">
+    <button role="tab" id="tab-patterns" aria-selected="true" type="button">Patterns</button>
+    <button role="tab" id="tab-alapana" aria-selected="false" type="button">Akaara practice</button>
+    <button role="tab" id="tab-free" aria-selected="false" type="button">Free sing</button>
+  </div>
+
+  <section id="panel-patterns" style="display:flex;flex-direction:column;gap:12px">
+    <p class="intro">Sing each pattern up and down in akaaram or with swaras. Tap Load more for new patterns.</p>
+    <div id="patList" style="display:flex;flex-direction:column;gap:22px"></div>
+    <button class="more" id="morePat" type="button">Load more patterns</button>
+  </section>
+
+  <section id="panel-alapana" hidden style="display:flex;flex-direction:column;gap:12px">
+    <div class="bar"><p class="intro" style="flex:1;min-width:200px">Kacheri-style akaaram. It starts around sa, climbs swara by swara to tara sthayi with brigas, then comes back to sa. Each phrase begins on the swara the last one rested on. Commas show karvai (hold the note). Notes under a line are fast brigas.</p><button class="ghost" id="newAlapana" type="button">Start over</button></div>
+    <div class="chain" id="chain"></div>
+    <button class="more" id="moreAk" type="button">Load more phrases</button>
+  </section>
+
+  <section id="panel-free" hidden style="display:flex;flex-direction:column;gap:12px">
+    <div class="card" id="freeCard">
+      <div class="card-head"><h3>Sing anything in this raga</h3><div style="display:flex;gap:8px"><label class="ghost" for="freeFile" id="freeUploadLbl" hidden>Upload</label><input type="file" id="freeFile" accept="audio/*" hidden><button class="sing" id="freeBtn" type="button">Sing</button></div></div>
+      <p class="hint">An alapana, a kriti line or kalpana swaras. Any swara outside the raga turns red. Amber means off shruti.</p>
+      <div class="stats">
+        <div class="stat"><b id="fsNotes">0</b><span>notes heard</span></div>
+        <div class="stat"><b id="fsIn">–</b><span>inside raga</span></div>
+        <div class="stat"><b id="fsTune">–</b><span>avg shruti offset</span></div>
+        <div class="stat"><b id="fsOff">0</b><span>off shruti</span></div>
+      </div>
+      <div class="strip" id="fsStrip"><span class="hint">Your notes appear here as you sing.</span></div>
+      <div class="result" id="fsWrong" hidden></div>
+    </div>
+  </section>
+
+  <details class="settings">
+    <summary>Settings</summary>
+    <div class="set-grid">
+      <div class="set-row"><span>Tanpura first string</span><select id="tanFirst"><option value="auto">Auto</option><option value="pa">Pa</option><option value="ma">Ma</option><option value="ni">Ni</option></select></div>
+      <div class="set-row"><span>Tanpura volume</span><input type="range" id="tanVol" min="0" max="1" step="0.05" value="0.6"></div>
+      <div class="set-row"><span>Find my Sa (sing and hold your Sa)</span><button class="ghost" id="findSa" type="button">Find my Sa</button></div>
+      <div class="set-row"><label for="gamakaTol">Gamaka-friendly checking (more lenient)</label><input type="checkbox" id="gamakaTol"></div>
+      <p class="hint">Wear earphones while singing so the tanpura doesn't leak into the mic.</p>
+    </div>
+  </details>
+</div>
+
+<div class="monitor" id="monitor" hidden>
+  <div class="mon-in">
+    <div class="mon-sw" id="monSw">–</div>
+    <div class="mon-mid">
+      <div class="meter" aria-hidden="true"><div class="ticks"></div><div class="zone"></div><div class="needle" id="needle"></div></div>
+      <div class="mon-txt"><span id="monTune">Sing…</span><span id="monNext"></span></div>
+    </div>
+    <button class="mon-stop" id="monStop" type="button">Stop</button>
+  </div>
+</div>
+
+<script>
+(function(){
+"use strict";
+/* ---------- Music data ---------- */
+const SEMI={S:0,R1:1,R2:2,R3:3,G1:2,G2:3,G3:4,M1:5,M2:6,P:7,D1:8,D2:9,D3:10,N1:9,N2:10,N3:11};
+const TARGET=[0,112,204,316,386,498,590,702,814,884,996,1088];
+const SYL={S:"sa",R:"ri",G:"ga",M:"ma",P:"pa",D:"da",N:"ni"};
+const SUBS={"1":"₁","2":"₂","3":"₃"};
+const GENERIC=["sa","ri₁","ri₂","ga₂","ga₃","ma₁","ma₂","pa","da₁","da₂","ni₂","ni₃"];
+const SHRUTI=[["C","1"],["C#","1½"],["D","2"],["D#","2½"],["E","3"],["F","4"],["F#","4½"],["G","5"],["G#","5½"],["A","6"],["A#","6½"],["B","7"]];
+const saFreqOf=i=>130.8128*Math.pow(2,i/12);
+
+function M(name,mela,sw,extra){const a="S "+sw+" S'";return{name,type:"mela",mela,aro:a,ava:a.split(" ").reverse().join(" "),...(extra||{})}}
+function J(name,parent,aro,ava,extra){return{name,type:"janya",parent,aro,ava:ava||aro.split(" ").reverse().join(" "),...(extra||{})}}
+const RAGAS=[
+ M("Hanumatodi",8,"R1 G2 M1 P D1 N2",{alias:"Todi"}),
+ M("Mayamalavagowla",15,"R1 G3 M1 P D1 N3"),
+ M("Chakravakam",16,"R1 G3 M1 P D2 N2"),
+ M("Natabhairavi",20,"R2 G2 M1 P D1 N2"),
+ M("Keeravani",21,"R2 G2 M1 P D1 N3"),
+ M("Kharaharapriya",22,"R2 G2 M1 P D2 N2"),
+ M("Gowrimanohari",23,"R2 G2 M1 P D2 N3"),
+ M("Charukesi",26,"R2 G3 M1 P D1 N2"),
+ M("Harikambhoji",28,"R2 G3 M1 P D2 N2"),
+ M("Shankarabharanam",29,"R2 G3 M1 P D2 N3"),
+ M("Subhapantuvarali",45,"R1 G2 M2 P D1 N3"),
+ M("Pantuvarali",51,"R1 G3 M2 P D1 N3",{alias:"Kamavardhini"}),
+ M("Shanmukhapriya",56,"R2 G2 M2 P D1 N2"),
+ M("Simhendramadhyamam",57,"R2 G2 M2 P D1 N3"),
+ M("Hemavati",58,"R2 G2 M2 P D2 N2"),
+ M("Dharmavati",59,"R2 G2 M2 P D2 N3"),
+ M("Latangi",63,"R2 G3 M2 P D1 N3"),
+ M("Vachaspati",64,"R2 G3 M2 P D2 N2"),
+ M("Kalyani",65,"R2 G3 M2 P D2 N3"),
+ J("Mohanam","Harikambhoji (28)","S R2 G3 P D2 S'"),
+ J("Hamsadhwani","Shankarabharanam (29)","S R2 G3 P N3 S'"),
+ J("Hindolam","Natabhairavi (20)","S G2 M1 D1 N2 S'"),
+ J("Abhogi","Kharaharapriya (22)","S R2 G2 M1 D2 S'"),
+ J("Shuddha Dhanyasi","Kharaharapriya (22)","S G2 M1 P N2 S'"),
+ J("Madhyamavati","Kharaharapriya (22)","S R2 M1 P N2 S'"),
+ J("Shivaranjani","Kharaharapriya (22)","S R2 G2 P D2 S'"),
+ J("Sriranjani","Kharaharapriya (22)","S R2 G2 M1 D2 N2 S'"),
+ J("Sri","Kharaharapriya (22)","S R2 M1 P N2 S'","S' N2 P D2 N2 P M1 R2 G2 R2 S"),
+ J("Andolika","Kharaharapriya (22)","S R2 M1 P N2 S'","S' N2 D2 M1 R2 S"),
+ J("Revati","Ratnangi (2)","S R1 M1 P N2 S'"),
+ J("Dhanyasi","Hanumatodi (8)","S G2 M1 P N2 S'","S' N2 D1 P M1 G2 R1 S"),
+ J("Malahari","Mayamalavagowla (15)","S R1 M1 P D1 S'","S' D1 P M1 G3 R1 S"),
+ J("Saveri","Mayamalavagowla (15)","S R1 M1 P D1 S'","S' N3 D1 P M1 G3 R1 S"),
+ J("Bowli","Mayamalavagowla (15)","S R1 G3 P D1 S'","S' N3 D1 P G3 R1 S"),
+ J("Vasanta","Suryakantam (17)","S M1 G3 M1 D2 N3 S'","S' N3 D2 M1 G3 R1 S"),
+ J("Nalinakanti","Sarasangi (27)","S G3 R2 M1 P N3 S'","S' N3 P M1 G3 R2 S"),
+ J("Valaji","Harikambhoji (28)","S G3 P D2 N2 S'"),
+ J("Kamboji","Harikambhoji (28)","S R2 G3 M1 P D2 S'","S' N2 D2 P M1 G3 R2 S",{extra:["N3"],note:"Bhashanga: kakali ni (ni₃) is allowed as anya swara."}),
+ J("Kedaragowla","Harikambhoji (28)","S R2 M1 P N2 S'","S' N2 D2 P M1 G3 R2 S"),
+ J("Yadukula Kambhoji","Harikambhoji (28)","S R2 M1 P D2 S'","S' N2 D2 P M1 G3 R2 S"),
+ J("Suruti","Harikambhoji (28)","S R2 M1 P N2 S'","S' N2 D2 P M1 G3 P M1 R2 S"),
+ J("Bilahari","Shankarabharanam (29)","S R2 G3 P D2 S'","S' N3 D2 P M1 G3 R2 S"),
+ J("Arabhi","Shankarabharanam (29)","S R2 M1 P D2 S'","S' N3 D2 P M1 G3 R2 S"),
+ J("Shuddha Saveri","Shankarabharanam (29)","S R2 M1 P D2 S'"),
+ J("Kadanakutuhalam","Shankarabharanam (29)","S R2 M1 D2 N3 G3 P S'","S' N3 D2 P M1 G3 R2 S"),
+ J("Nattai","Chalanata (36)","S R3 G3 M1 P D3 N3 S'","S' N3 P M1 R3 S"),
+ J("Hamsanandi","Gamanashrama (53)","S R1 G3 M2 D2 N3 S'"),
+ J("Amritavarshini","Chitrambari (66)","S G3 M2 P N3 S'")
+];
+function parseTok(t){
+  const m=/^([SRGMPDN])([123]?)(['.]?)$/.exec(t);const code=m[1]+(m[2]||"");const oct=m[3]==="'"?1:m[3]==="."?-1:0;
+  return {code,oct,k:SEMI[code]+12*oct};
+}
+function prepRaga(r){
+  r.aroN=r.aro.split(" ").map(parseTok);r.avaN=r.ava.split(" ").map(parseTok);
+  r.codeBySemi={};[...r.aroN,...r.avaN,...(r.extra||[]).map(c=>({code:c}))].forEach(n=>{const s=SEMI[n.code];if(!(s in r.codeBySemi))r.codeBySemi[s]=n.code});
+  r.allowed=new Set(Object.keys(r.codeBySemi).map(Number));
+  const up=r.aroN.slice(0,-1),dn=r.avaN.slice(0,-1);
+  r.aroExt=[];[-1,0,1].forEach(o=>up.forEach(n=>r.aroExt.push(n.k+12*o)));r.aroExt.push(24);
+  r.avaExt=[];[1,0,-1].forEach(o=>dn.forEach(n=>r.avaExt.push(n.k+12*o)));r.avaExt.push(-12);
+}
+RAGAS.forEach(prepRaga);
+
+const store={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
+const state={raga:null,shruti:7,sa:saFreqOf(7),gamaka:false,pat:0};
+const $=id=>document.getElementById(id);
+
+/* ---------- Notation ---------- */
+const syl=c=>SYL[c[0]];
+const fullName=c=>SYL[c[0]]+(c.length>1?SUBS[c[1]]:"");
+const keyOct=k=>Math.floor(k/12), keySemi=k=>((k%12)+12)%12;
+function tile(n,i,extra){const c=n.oct<0?" lo":n.oct>0?" hi":"";return `<span class="t${c}${extra||""}"${i!==undefined?` data-i="${i}"`:""}>${syl(n.code)}</span>`}
+function nameForSeg(semi){const r=state.raga;return r.allowed.has(semi)?fullName(r.codeBySemi[semi]):GENERIC[semi]}
+function ordinal(n){const s=["th","st","nd","rd"],v=n%100;return n+(s[(v-20)%10]||s[v]||s[0])}
+function noteFromKey(r,k){return{code:r.codeBySemi[keySemi(k)],oct:keyOct(k),k}}
+
+/* ---------- Patterns (large library, loaded in batches) ---------- */
+function validPair(r,a,b){if(a===b)return true;for(const seq of [r.aroExt,r.avaExt])for(let i=0;i<seq.length;i++)if(seq[i]===a)for(let j=i+1;j<=i+2&&j<seq.length;j++)if(seq[j]===b)return true;return false}
+function lineValid(r,groups){if(!groups.length)return false;for(const g of groups)for(let i=1;i<g.length;i++)if(!validPair(r,g[i-1].k,g[i].k))return false;return true}
+function windows(seq,order){const W=Math.max(...order)+1,g=[];for(let i=0;i+W<=seq.length;i++){const w=seq.slice(i,i+W);g.push(order.map(o=>w[o]))}return g}
+const NAMED=[
+ {o:"scale",name:"Arohanam and avarohanam",desc:"The raga's scale. Start every session here."},
+ {o:[0,0],name:"Janta",desc:"Each swara twice with a firm stress. A repeated swara counts as one held note."},
+ {o:[0,1,2],name:"Groups of three",desc:"sa ri ga, ri ga ma … moving up one step each time."},
+ {o:[0,1,2,3],name:"Groups of four",desc:"Four-swara runs through the raga."},
+ {o:[0,1,2,1],name:"Turns",desc:"Up three, back one."},
+ {o:[0,2,1,3],name:"Dhattu",desc:"Skip and return. Tests your swara memory."},
+ {o:[0,1,2,3,4],name:"Groups of five",desc:"Longer runs. Keep the breath steady."},
+ {o:[0,0,1,1,2,2],name:"Janta in threes",desc:"Three swaras, each doubled."},
+ {o:[0,2,1],name:"Skip in threes",desc:"Jump one swara, then fill it in."},
+ {o:[0,1,2,3,2,1],name:"Up four, back two",desc:"Rise and turn back inside each group."},
+ {o:[0,0,2,2,1,1,3,3],name:"Dhattu janta",desc:"Dhattu pattern with each swara doubled."},
+ {o:[0,1,0,2,1,2],name:"Weaving",desc:"Small back-and-forth movements."},
+ {o:[0,3,2,1],name:"Fall in fours",desc:"Jump up, then come down step by step."},
+ {o:[0,1,3,2],name:"Twist in fours",desc:"Swap the last two swaras."},
+ {o:[0,2,4,3,1],name:"Wide dhattu",desc:"Jumps across five swaras."},
+ {o:[0,1,2,3,4,3,2,1],name:"Hill in fives",desc:"Up five and back to the second."}
+];
+function autoOrders(){
+  const out=[],seen=new Set(NAMED.filter(n=>n.o!=="scale").map(n=>n.o.join()));
+  const dfs=seq=>{
+    const L=seq.length;
+    if(L>=3){const mx=Math.max(...seq);if(mx>=1&&seq[L-1]>0&&!seen.has(seq.join())){seen.add(seq.join());out.push(seq.slice())}}
+    if(L>=8)return;
+    const last=seq[L-1];
+    for(let v=0;v<=4;v++){const d=Math.abs(v-last);if(d<1||d>2)continue;if(seq.filter(x=>x===v).length>=2)continue;if(L>=3&&v===seq[L-2]&&seq[L-1]===seq[L-3])continue;if(v>Math.max(...seq)+1)continue;seq.push(v);dfs(seq);seq.pop()}
+  };
+  dfs([0]);
+  const score=s=>s.length*10+Math.max(...s)*3+s.filter((x,i)=>i&&Math.abs(x-s[i-1])===2).length;
+  return out.sort((a,b)=>score(a)-score(b)).map(o=>({o,name:"Pattern "+o.map(x=>x+1).join(" "),desc:`Inside each group, sing swaras in the order ${o.map(x=>x+1).join("-")}.`}));
+}
+const BASELIB=[...NAMED,...autoOrders()];
+const PATLIB=[...BASELIB,...BASELIB.map(p=>({...p,wide:true,name:p.name+" · wide range",desc:p.desc+" Runs from mandra sthayi up to tara sthayi."}))];
+function wideRange(r){
+  const lowK=nyasas(r).low,top=[19,17,16,14].find(k=>r.allowed.has(keySemi(k)))||12;
+  const i=r.aroExt.indexOf(lowK),j=r.aroExt.lastIndexOf(top);
+  const up=r.aroExt.slice(i,j+1);
+  const a=r.avaExt.indexOf(top),b=r.avaExt.lastIndexOf(lowK);
+  const dn=r.avaExt.slice(a,b+1);
+  return{up:up.map(k=>noteFromKey(r,k)),dn:dn.map(k=>noteFromKey(r,k))};
+}
+function makePattern(r,p){
+  const A=p.wide?wideRange(r).up:r.aroN,D=p.wide?wideRange(r).dn:r.avaN;
+  if(p.o==="scale")return{up:[A],dn:[D]};
+  const up=windows(A,p.o),dn=windows(D,p.o);
+  if(!up.length||!dn.length||!lineValid(r,up)||!lineValid(r,dn))return null;
+  return{up,dn};
+}
+
+/* ---------- Akaara practice: kacheri-style alapana, generated phrase by phrase ---------- */
+function buildGraph(r){const g={};const add=(a,b)=>{(g[a]=g[a]||[]).push(b)};
+  for(const seq of [r.aroExt,r.avaExt])for(let i=0;i<seq.length-1;i++)if(seq[i]!==seq[i+1])add(seq[i],seq[i+1]);
+  for(const k in g)g[k]=[...new Set(g[k])];return g}
+function walkTo(r,g,from,to,lo,hi,minL,maxL){
+  for(let a=0;a<4000;a++){
+    let cur=from,prev=null;const path=[from];
+    for(let s=0;s<maxL;s++){
+      const opts=(g[cur]||[]).filter(k=>k>=lo&&k<=hi);if(!opts.length)break;
+      let tot=0;const ws=opts.map(k=>{let w=1;if(k===prev)w*=.25;if(prev!==null&&Math.sign(k-cur)===Math.sign(cur-prev))w*=2.2;if(path.length>=3&&k===path[path.length-3])w*=.4;if(path.length>=minL-1)w*=Math.exp(-Math.abs(k-to)/3);tot+=w;return w});
+      let x=Math.random()*tot,i=0;while(i<ws.length-1&&x>ws[i]){x-=ws[i];i++}
+      prev=cur;cur=opts[i];path.push(cur);
+      if(path.length>=minL&&cur===to)return path;
+    }
+  }
+  const seq=to>=from?r.aroExt:r.avaExt;const i=seq.indexOf(from),j=seq.indexOf(to,i+1);
+  return i>=0&&j>i?seq.slice(i,j+1):[from,to];
+}
+function nyasas(r){
+  const has=s=>r.allowed.has(s),pick=a=>a.find(has);
+  const low=[7,9,8,10,11].find(has)-12;
+  return{low,ga:pick([4,3,2]),pa:pick([7,6,5,8]),up:pick([11,10,9,8])};
+}
+function akaaraPlan(r){
+  const {low,ga,pa,up}=nyasas(r),nm=k=>syl(r.codeBySemi[keySemi(k)]);
+  return [
+    {stage:"Opening",title:"Settle on sa",from:0,to:0,lo:low,hi:ga,min:3,max:6,style:"slow"},
+    {stage:"Opening",title:`Dip to mandra ${nm(low)}`,from:0,to:low,lo:low-2,hi:ga,min:3,max:6,style:"slow"},
+    {stage:"Opening",title:"Back to sa",from:low,to:0,lo:low-2,hi:pa,min:3,max:7,style:"slow"},
+    {stage:"Raga vardhani",title:`Rise to ${nm(ga)}`,from:0,to:ga,lo:low,hi:pa,min:4,max:7,style:"slow"},
+    {stage:"Raga vardhani",title:`Dwell on ${nm(ga)}`,from:ga,to:ga,lo:0,hi:pa,min:5,max:8,style:"medium"},
+    {stage:"Raga vardhani",title:`Rise to ${nm(pa)}`,from:ga,to:pa,lo:0,hi:up,min:4,max:8,style:"medium"},
+    {stage:"Raga vardhani",title:`Dwell on ${nm(pa)}`,from:pa,to:pa,lo:ga,hi:12,min:5,max:9,style:"medium"},
+    {stage:"Raga vardhani",title:`Rise to ${nm(up)}`,from:pa,to:up,lo:ga,hi:12,min:4,max:8,style:"medium"},
+    {stage:"Tara sthayi",title:"Arrive at tara sa",from:up,to:12,lo:pa,hi:14,min:4,max:8,style:"medium"},
+    {stage:"Tara sthayi",title:"Briga around tara sa",from:12,to:12,lo:up,hi:17,min:8,max:12,style:"briga"},
+    {stage:"Tara sthayi",title:"Reach higher and return",from:12,to:12,lo:pa,hi:19,min:9,max:14,style:"briga"},
+    {stage:"Descent",title:`Sweep down to ${nm(pa)}`,from:12,to:pa,lo:ga,hi:16,min:8,max:14,style:"briga"},
+    {stage:"Descent",title:`Come down to ${nm(ga)}`,from:pa,to:ga,lo:0,hi:up,min:5,max:9,style:"medium"},
+    {stage:"Descent",title:"Return to sa",from:ga,to:0,lo:low,hi:pa,min:4,max:8,style:"slow"},
+    {stage:"Mukthayi",title:"Close on sa",from:0,to:0,lo:low-2,hi:ga,min:4,max:7,style:"slow"}
+  ];
+}
+function shapePhrase(r,keys,style){
+  // karvai on the opening and resting swaras, brigas in the middle of fast phrases
+  const notes=keys.map(k=>noteFromKey(r,k)),L=notes.length;
+  if(style==="briga"){
+    notes.forEach((n,i)=>{n.dur=1;n.fast=i>0&&i<L-1});notes[0].dur=2;notes[L-1].dur=3;
+    return [[notes[0]],notes.slice(1,L-1),[notes[L-1]]];
+  }
+  notes.forEach((n,i)=>{n.dur=i===0?2:i===L-1?(style==="slow"?4:3):(Math.random()<(style==="slow"?.4:.2)?2:1)});
+  return [notes];
+}
+const ak={plan:null,i:0,round:0,g:null};
+function nextAkaara(r){
+  if(!ak.plan){ak.plan=akaaraPlan(r);ak.g=buildGraph(r)}
+  const s=ak.plan[ak.i];
+  const keys=walkTo(r,ak.g,s.from,s.to,s.lo,s.hi,s.min,s.max);
+  const out={stage:s.stage,title:s.title,groups:shapePhrase(r,keys,s.style),round:ak.round};
+  ak.i++;if(ak.i>=ak.plan.length){ak.i=0;ak.round++}
+  return out;
+}
+
+/* ---------- Line cards ---------- */
+const lines=new Map();let lineSeq=0;
+function tileFull(n,i,extra){
+  const c=(n.oct<0?" lo":n.oct>0?" hi":"")+(extra||"");
+  const kv=n.dur>1?`<span class="kv">${",".repeat(n.dur-1)}</span>`:"";
+  return `<span class="t${c}" data-i="${i}">${syl(n.code)}${kv}</span>`;
+}
+function lineCard(groups,title,step,opts){
+  opts=opts||{};const id="ln"+(++lineSeq);
+  const flat=groups.flat(),seq=[],idx=[];
+  flat.forEach(n=>{if(!seq.length||seq[seq.length-1].k!==n.k)seq.push({...n});else if(!n.fast)seq[seq.length-1].fast=false;idx.push(seq.length-1)});
+  let p=0;
+  const html=groups.filter(g=>g.length).map(gr=>`<span class="grp${gr[0].fast?" fast":""}">${gr.map(n=>{const i=idx[p++];return tileFull(n,i,opts.nyasa&&p===flat.length?" nyasa":"")}).join("")}</span>`).join("");
+  lines.set(id,{seq});
+  return `<div class="card" id="${id}"><div class="card-head"><div>${step?`<div class="step">${step}</div>`:""}<h3>${title}</h3></div><button class="sing chk" data-line="${id}" type="button">Sing</button></div><div class="tiles">${html}</div><div class="upload" hidden></div><div class="result" hidden></div></div>`;
+}
+
+/* ---------- Render ---------- */
+function renderHero(){
+  const r=state.raga;
+  $("ragaMeta").textContent=(r.alias?r.alias+" · ":"")+(r.type==="mela"?"Melakarta "+r.mela:"Janya of "+r.parent);
+  $("aroT").innerHTML=r.aroN.map(n=>tile(n)).join("");
+  $("avaT").innerHTML=r.avaN.map(n=>tile(n)).join("");
+  const miss=[...Array(12).keys()].filter(s=>!r.allowed.has(s)).map(s=>GENERIC[s]);
+  $("ragaAvoid").innerHTML=`${r.note?r.note+" ":""}Not in this raga: <b>${miss.join(" · ")}</b>`;
+}
+const pat={next:0,shown:0};
+function addPatterns(n){
+  const r=state.raga;let html="",added=0;
+  while(added<n&&pat.next<PATLIB.length){
+    const p=PATLIB[pat.next++];const m=makePattern(r,p);if(!m)continue;
+    pat.shown++;added++;
+    html+=`<div class="pat"><div class="pat-head"><span class="num">PATTERN ${pat.shown}</span><h3>${p.name}</h3><p>${p.desc}</p></div>${lineCard(m.up,"Arohanam","UP")}${lineCard(m.dn,"Avarohanam","DOWN")}</div>`;
+  }
+  $("patList").insertAdjacentHTML("beforeend",html);
+  const done=pat.next>=PATLIB.length;$("morePat").hidden=done;
+}
+function renderPatterns(){pat.next=0;pat.shown=0;$("patList").innerHTML="";addPatterns(3)}
+function addAkaara(n){
+  const r=state.raga;let html="";
+  for(let i=0;i<n;i++){
+    const ph=nextAkaara(r);const count=++ak.count;
+    if(count>1)html+=`<div class="link">continues from <b>${syl(ph.groups[0][0].code)}</b></div>`;
+    html+=lineCard(ph.groups,ph.title,`<span class="stage">${ph.stage}${ph.round?" · round "+(ph.round+1):""}</span><br>PHRASE ${count}`,{nyasa:true});
+  }
+  $("chain").insertAdjacentHTML("beforeend",html);
+}
+function renderAlapana(){ak.plan=null;ak.i=0;ak.round=0;ak.count=0;$("chain").innerHTML="";addAkaara(5)}
+function renderAll(){stopSession(false);lines.clear();renderHero();renderPatterns();renderAlapana();resetFree()}
+
+/* ---------- Controls ---------- */
+function fillControls(){
+  const sel=$("ragaSel");
+  [["Janya ragas","janya"],["Melakarta ragas","mela"]].forEach(([l,t])=>{const og=document.createElement("optgroup");og.label=l;RAGAS.filter(r=>r.type===t).slice().sort((a,b)=>a.name.localeCompare(b.name)).forEach(r=>{const o=document.createElement("option");o.value=r.name;o.textContent=r.name;og.appendChild(o)});sel.appendChild(og)});
+  const ss=$("shrutiSel");SHRUTI.forEach(([n,kt],i)=>{const o=document.createElement("option");o.value=i;o.textContent=`${n} · ${kt} kattai`;ss.appendChild(o)});
+  state.raga=RAGAS.find(r=>r.name===store.get("ss_raga"))||RAGAS.find(r=>r.name==="Mohanam");
+  const sv=store.get("ss_shruti");setShruti(sv!==null&&!isNaN(+sv)?+sv:7,false);
+  sel.value=state.raga.name;
+  sel.onchange=()=>{state.raga=RAGAS.find(r=>r.name===sel.value);store.set("ss_raga",state.raga.name);renderAll();if(tan.on)tan.restart()};
+  ss.onchange=()=>setShruti(+ss.value,true);
+  $("gamakaTol").onchange=e=>{state.gamaka=e.target.checked};
+  $("morePat").onclick=()=>addPatterns(3);
+  $("moreAk").onclick=()=>addAkaara(5);
+  $("newAlapana").onclick=()=>{stopSession(false);renderAlapana()};
+}
+function setShruti(i,save){state.shruti=i;state.sa=saFreqOf(i);$("shrutiSel").value=i;if(save)store.set("ss_shruti",i);if(tan.on)tan.restart()}
+
+/* ---------- Audio context ---------- */
+let ctx=null;
+function getCtx(){if(!ctx){const AC=window.AudioContext||window.webkitAudioContext;ctx=new AC()}if(ctx.state==="suspended")ctx.resume();return ctx}
+
+/* ---------- Tanpura: additive synthesis with a jawari (buzzing bridge) spectrum ---------- */
+const PLUCK_T=[0,1.15,2.3,3.45],CYCLE=5.2;
+function renderString(out,sr,f,t0,len,seed){
+  // the jawari makes energy bloom into high harmonics and a bright band sweep slowly downward
+  const dur=Math.min(CYCLE+1.8,7),ns=Math.floor(dur*sr),start=Math.floor(t0*sr);
+  const N=Math.max(8,Math.min(48,Math.floor(7500/f)));
+  let rnd=seed;const rand=()=>{rnd=(rnd*16807)%2147483647;return rnd/2147483647};
+  const BL=256;
+  for(let n=1;n<=N;n++){
+    const fn=f*n*(1+0.00012*n*n);if(fn>sr/2.2)break;
+    const w=2*Math.PI*fn/sr,cw=Math.cos(w),sw=Math.sin(w);
+    let x=Math.cos(rand()*6.283),y=Math.sin(rand()*6.283);
+    const wob=0.6+rand()*0.9, wph=rand()*6.283;
+    let amp0=0;
+    for(let b=0;b<ns;b+=BL){
+      const t=b/sr;
+      const centre=3+20*Math.exp(-t/1.6)+1.5*Math.sin(2*Math.PI*0.35*t+wph);
+      const band=Math.exp(-((n-centre)*(n-centre))/(2*16));
+      const base=0.55/Math.pow(n,1.1);
+      const env=Math.exp(-t/2.6)*(1-Math.exp(-t/0.006));
+      const shimmer=1+0.18*Math.sin(2*Math.PI*wob*t+wph);
+      const amp1=(base+0.32*band/Math.sqrt(n))*env*shimmer;
+      const end=Math.min(BL,ns-b);
+      for(let s=0;s<end;s++){
+        const a=amp0+(amp1-amp0)*(s/end);
+        const nx=x*cw-y*sw;y=x*sw+y*cw;x=nx;
+        out[(start+b+s)%len]+=a*y;
+      }
+      const m=1/Math.sqrt(x*x+y*y);x*=m;y*=m;amp0=amp1;
+    }
+  }
+}
+function buildTanpuraBuffer(sa,firstRatio){
+  const c=getCtx(),sr=c.sampleRate,len=Math.floor(CYCLE*sr),out=new Float32Array(len);
+  const strings=[sa*firstRatio,sa*1.0006,sa*0.9995,sa/2];
+  strings.forEach((f,i)=>renderString(out,sr,f,PLUCK_T[i],len,1234+i*777));
+  let pk=0;for(let i=0;i<len;i++)pk=Math.max(pk,Math.abs(out[i]));
+  const buf=c.createBuffer(1,len,sr);const d=buf.getChannelData(0);for(let i=0;i<len;i++)d[i]=out[i]/pk*0.8;
+  return buf;
+}
+const tan={on:false,src:null,gain:null,t0:0,anim:null,
+  firstRatio(){const v=$("tanFirst").value,r=state.raga;if(v==="pa")return .75;if(v==="ma")return 2/3;if(v==="ni")return 15/16;return r.allowed.has(7)?.75:r.allowed.has(5)?2/3:r.allowed.has(11)?15/16:.75},
+  start(){
+    const c=getCtx();const btn=$("tanBtn");btn.classList.add("on");btn.setAttribute("aria-pressed","true");btn.setAttribute("aria-label","Stop tanpura");this.on=true;
+    setTimeout(()=>{
+      if(!this.on)return;
+      const buf=buildTanpuraBuffer(state.sa,this.firstRatio());
+      const g=c.createGain();g.gain.value=0;g.gain.setTargetAtTime(+$("tanVol").value,c.currentTime,.3);
+      const lp=c.createBiquadFilter();lp.type="lowpass";lp.frequency.value=6500;
+      const src=c.createBufferSource();src.buffer=buf;src.loop=true;src.connect(lp);lp.connect(g);g.connect(c.destination);
+      this.t0=c.currentTime+.05;src.start(this.t0);this.src=src;this.gain=g;
+      let last=-1;clearInterval(this.anim);
+      this.anim=setInterval(()=>{const ph=((c.currentTime-this.t0)%CYCLE+CYCLE)%CYCLE;let i=-1;PLUCK_T.forEach((t,j)=>{if(ph>=t)i=j});if(i!==last){last=i;const el=$("str"+i);if(el){el.classList.remove("pluck");void el.getBBox();el.classList.add("pluck")}}},50);
+    },20);
+  },
+  stop(){
+    this.on=false;clearInterval(this.anim);
+    if(this.src){const s=this.src,g=this.gain;g.gain.setTargetAtTime(0,ctx.currentTime,.15);setTimeout(()=>{try{s.stop()}catch(e){}g.disconnect()},900);this.src=null}
+    const btn=$("tanBtn");btn.classList.remove("on");btn.setAttribute("aria-pressed","false");btn.setAttribute("aria-label","Start tanpura");
+  },
+  restart(){this.stop();this.start()}
+};
+$("tanBtn").onclick=()=>tan.on?tan.stop():tan.start();
+$("tanVol").oninput=e=>{if(tan.gain)tan.gain.gain.setTargetAtTime(+e.target.value,ctx.currentTime,.05)};
+$("tanFirst").onchange=()=>{if(tan.on)tan.restart()};
+
+/* ---------- Pitch detection (YIN) ---------- */
+let yinBuf=new Float32Array(2048);
+function yin(buf,sr){
+  let rms=0;for(let i=0;i<buf.length;i++)rms+=buf[i]*buf[i];rms=Math.sqrt(rms/buf.length);if(rms<0.01)return null;
+  const tMin=Math.floor(sr/1000),tMax=Math.min(Math.floor(sr/70),buf.length>>1),W=buf.length-tMax;
+  if(yinBuf.length<tMax+2)yinBuf=new Float32Array(tMax+2);
+  const yb=yinBuf;yb[0]=1;let run=0;
+  for(let t=1;t<=tMax;t++){let s=0;for(let i=0;i<W;i++){const d=buf[i]-buf[i+t];s+=d*d}run+=s;yb[t]=run?s*t/run:1}
+  let tau=-1;for(let t=tMin;t<tMax;t++){if(yb[t]<0.15){while(t+1<tMax&&yb[t+1]<yb[t])t++;tau=t;break}}
+  if(tau<1)return null;
+  const a=yb[tau-1],b=yb[tau],c=yb[tau+1],den=a-2*b+c,sh=den?(a-c)/(2*den):0;
+  return sr/(tau+sh);
+}
+function median(a){const s=a.slice().sort((x,y)=>x-y);return s[s.length>>1]}
+function mapCents(c){
+  let oct=Math.floor(c/1200);const w=c-oct*1200;let best=0,bd=1e9;
+  for(let i=0;i<=12;i++){const T=i<12?TARGET[i]:1200,d=Math.abs(w-T);if(d<bd){bd=d;best=i}}
+  const T=best<12?TARGET[best]:1200;let semi=best;if(best===12){semi=0;oct++}
+  return{semi,oct,dev:w-T,k:semi+12*oct};
+}
+const tolerance=()=>state.gamaka?45:30;
+class Tracker{
+  constructor(onSeg,onFrame){this.onSeg=onSeg;this.onFrame=onFrame;this.hist=[];this.cur=null;this.stray=0;this.lastV=-1}
+  cfg(){return state.gamaka?{min:.24,grace:5}:{min:.15,grace:2}}
+  push(t,f){
+    if(!f||f<60||f>1100){if(this.cur&&t-this.lastV>.12)this.close();this.hist=[];this.onFrame(null);return}
+    this.hist.push(1200*Math.log2(f/state.sa));if(this.hist.length>5)this.hist.shift();
+    const n=mapCents(median(this.hist));this.lastV=t;this.onFrame(n);
+    if(!this.cur){this.cur={n,start:t,last:t,devs:[n.dev]};return}
+    if(n.k===this.cur.n.k){this.cur.last=t;this.cur.devs.push(n.dev);this.stray=0;return}
+    if(++this.stray<=this.cfg().grace)return;
+    this.close();this.cur={n,start:t,last:t,devs:[n.dev]};
+  }
+  close(){const c=this.cur;this.cur=null;this.stray=0;if(c&&c.last-c.start>=this.cfg().min)this.onSeg({k:c.n.k,semi:c.n.semi,oct:c.n.oct,dev:median(c.devs),dur:c.last-c.start})}
+}
+
+/* ---------- Microphone / recordings ---------- */
+let micDenied=false,live=null;
+async function getMic(){
+  if(micDenied||!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){micBlocked();return null}
+  try{return await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}})}
+  catch(e){micBlocked();return null}
+}
+function micBlocked(){micDenied=true;$("micBanner").hidden=false;$("freeUploadLbl").hidden=false;$("findSa").disabled=true}
+async function startLive(onSeg,onFrame){
+  const stream=await getMic();if(!stream)return false;
+  const c=getCtx(),src=c.createMediaStreamSource(stream),an=c.createAnalyser();an.fftSize=2048;src.connect(an);
+  const buf=new Float32Array(an.fftSize),tr=new Tracker(onSeg,onFrame);let lastT=0,raf=0;
+  const loop=ts=>{raf=requestAnimationFrame(loop);if(ts-lastT<33)return;lastT=ts;an.getFloatTimeDomainData(buf);tr.push(c.currentTime,yin(buf,c.sampleRate))};
+  raf=requestAnimationFrame(loop);
+  live={stop(){cancelAnimationFrame(raf);tr.close();src.disconnect();stream.getTracks().forEach(t=>t.stop());live=null}};
+  return true;
+}
+async function analyseFile(file,onSeg){
+  const c=getCtx();const audio=await c.decodeAudioData(await file.arrayBuffer());
+  const sr=audio.sampleRate,ch=audio.numberOfChannels,len=audio.length,data=new Float32Array(len);
+  for(let k=0;k<ch;k++){const d=audio.getChannelData(k);for(let i=0;i<len;i++)data[i]+=d[i]/ch}
+  const tr=new Tracker(onSeg,()=>{}),hop=Math.round(sr*.03),N=2048;
+  for(let i=0;i+N<len;i+=hop){tr.push(i/sr,yin(data.subarray(i,i+N),sr));if(i%(hop*200)===0)await new Promise(r=>setTimeout(r,0))}
+  tr.close();
+}
+
+/* ---------- Listening bar ---------- */
+const showMonitor=on=>{$("monitor").hidden=!on};
+function monFrame(n){
+  const sw=$("monSw"),nd=$("needle"),tx=$("monTune");
+  if(!n){sw.textContent="–";sw.classList.remove("bad");tx.textContent="Sing…";nd.style.left="50%";return}
+  const inR=state.raga.allowed.has(n.semi);sw.textContent=nameForSeg(n.semi);sw.classList.toggle("bad",!inR);
+  nd.style.left=(50+Math.max(-50,Math.min(50,n.dev)))+"%";
+  const tol=tolerance(),d=Math.round(n.dev);
+  tx.textContent=!inR?`Not in ${state.raga.name}`:Math.abs(n.dev)<=tol?"In shruti":`${n.dev>0?"Sharp":"Flat"} by ${Math.abs(d)}¢`;
+}
+$("monStop").onclick=()=>stopSession(true);
+
+/* ---------- Checking a line ---------- */
+let session=null;
+const ST=["st-next","st-ok","st-off","st-wrong","st-miss"];
+function setNoteState(el,i,cls){el.querySelectorAll(`.tiles .t[data-i="${i}"]`).forEach(s=>{s.classList.remove(...ST);if(cls)s.classList.add(cls)})}
+function resetLine(id){const el=$(id);if(!el)return;el.classList.remove("active");el.querySelectorAll(".tiles .t").forEach(s=>s.classList.remove(...ST));el.querySelector(".result").hidden=true;el.querySelector(".upload").hidden=true;el.querySelector(".chk").textContent="Sing"}
+function onPatternSeg(s,seg){
+  if(s.done)return;const exp=s.seq,r=state.raga;
+  if(s.octOff===null){for(let j=s.ptr;j<Math.min(s.ptr+2,exp.length);j++)if(keySemi(exp[j].k)===seg.semi){s.octOff=seg.oct-keyOct(exp[j].k);break}}
+  const k=seg.k-12*(s.octOff||0),tol=tolerance();
+  const mark=j=>{s.devs[j]=seg.dev;s.st[j]=Math.abs(seg.dev)>tol?"off":"ok";setNoteState(s.el,j,"st-"+s.st[j])};
+  if(s.ptr>0&&k===exp[s.ptr-1].k)return;
+  if(k===exp[s.ptr].k){mark(s.ptr);s.ptr++}
+  else{
+    // look ahead: one skipped swara, or a run of fast briga swaras that were too quick to catch
+    let j=-1;for(let q=s.ptr+1;q<Math.min(exp.length,s.ptr+5);q++){if(exp[q].k===k){j=q;break}if(!exp[q].fast&&q>s.ptr)break}
+    if(j>s.ptr&&!(j>s.ptr+1&&!exp.slice(s.ptr,j).every(n=>n.fast))){
+      for(let q=s.ptr;q<j;q++){if(exp[q].fast&&s.st[q]!=="wrong"){s.st[q]="skip";setNoteState(s.el,q,null)}else{if(!s.st[q])s.st[q]="miss";setNoteState(s.el,q,s.st[q]==="wrong"?"st-wrong":"st-miss")}}
+      mark(j);s.ptr=j+1;
+    }else if(exp[s.ptr].fast&&r.allowed.has(seg.semi)){return}
+    else{const last=s.wrong[s.wrong.length-1];if(!(last&&last.at===s.ptr&&last.semi===seg.semi))s.wrong.push({at:s.ptr,semi:seg.semi,inRaga:r.allowed.has(seg.semi)});s.st[s.ptr]="wrong";setNoteState(s.el,s.ptr,"st-wrong");return}}
+  if(s.ptr>=exp.length){s.done=true;setTimeout(()=>{if(session===s)stopSession(true)},250);return}
+  setNoteState(s.el,s.ptr,"st-next");$("monNext").textContent="Next: "+fullName(exp[s.ptr].code);
+}
+function patternResult(s){
+  const exp=s.seq,r=state.raga,items=[];let ok=0,off=0,bad=0;
+  exp.forEach((n,i)=>{const nm=fullName(n.code);
+    if(s.st[i]==="ok"||s.st[i]==="skip")ok++;
+    else if(s.st[i]==="off"){off++;items.push(`${ordinal(i+1)} swara (${nm}) was <b>${Math.abs(Math.round(s.devs[i]))}¢ ${s.devs[i]>0?"sharp":"flat"}</b>`)}
+    else if(s.st[i]==="wrong"){bad++;const w=s.wrong.filter(x=>x.at===i).map(x=>x.inRaga?fullName(r.codeBySemi[x.semi]):`${GENERIC[x.semi]}, which is not in ${r.name}`);items.push(`${ordinal(i+1)} swara should be <b>${nm}</b>. You sang ${w.join(", then ")}`)}
+    else if(s.st[i]==="miss"){bad++;items.push(`${ordinal(i+1)} swara (${nm}) was skipped`)}
+  });
+  const left=exp.length-s.st.filter(Boolean).length;
+  if(left>0)items.push(`Stopped early: ${left} swara${left>1?"s":""} not sung`);
+  const devs=s.devs.filter(d=>d!==null);
+  if(devs.length>=3){const m=devs.reduce((a,b)=>a+b,0)/devs.length;if(Math.abs(m)>15)items.push(`Overall you sit <b>${Math.abs(Math.round(m))}¢ ${m>0?"sharp":"flat"}</b>. Check your Sa against the tanpura`)}
+  const pct=ok/exp.length,cls=pct>=.85?"good":pct>=.6?"mid":"bad";
+  const head=!bad&&!off&&!left?`<span class="score good">All ${exp.length} swaras right and in shruti</span>`:`<span class="score ${cls}">${ok} of ${exp.length} swaras right${off?`, ${off} off shruti`:""}</span>`;
+  const el=s.el.querySelector(".result");el.innerHTML=head+(items.length?`<ul>${items.map(x=>`<li>${x}</li>`).join("")}</ul>`:"");el.hidden=false;
+}
+async function startPattern(id){
+  stopSession(false);
+  const L=lines.get(id);const s={type:"pattern",id,el:$(id),seq:L.seq,ptr:0,st:new Array(L.seq.length).fill(null),devs:new Array(L.seq.length).fill(null),wrong:[],octOff:null,done:false};session=s;
+  s.el.classList.add("active");setNoteState(s.el,0,"st-next");const btn=s.el.querySelector(".chk");
+  const ok=await startLive(seg=>onPatternSeg(s,seg),monFrame);
+  if(session!==s){if(live)live.stop();return}
+  if(ok){btn.textContent="Stop";showMonitor(true);monFrame(null);$("monNext").textContent="Next: "+fullName(s.seq[0].code)}
+  else{
+    const up=s.el.querySelector(".upload"),fid="f_"+id;
+    up.innerHTML=`<span>Record yourself singing this, then choose the recording.</span><input type="file" accept="audio/*" id="${fid}"><span class="hint" id="${fid}_st"></span>`;up.hidden=false;btn.textContent="Cancel";
+    $(fid).onchange=async e=>{const f=e.target.files[0];if(!f)return;$(fid+"_st").textContent="Listening to your recording…";
+      try{await analyseFile(f,seg=>onPatternSeg(s,seg));up.hidden=true;if(session===s){s.done=true;finishSession(s)}}
+      catch(err){$(fid+"_st").textContent="Couldn't read that file. Try MP3, M4A or WAV."}};
+  }
+}
+function finishSession(s){
+  if(s.type==="pattern"){patternResult(s);s.el.classList.remove("active");s.el.querySelector(".chk").textContent="Again";s.el.querySelectorAll(".st-next").forEach(x=>x.classList.remove("st-next"))}
+  else freeSummary();
+  session=null;
+}
+function stopSession(showResult){
+  if(live)live.stop();showMonitor(false);
+  const s=session;if(!s)return;
+  if(showResult&&(s.type==="free"||s.st.some(Boolean)))finishSession(s);
+  else{if(s.type==="pattern")resetLine(s.id);else{$("freeBtn").textContent="Sing";$("freeCard").classList.remove("active")}session=null}
+}
+document.addEventListener("click",e=>{const b=e.target.closest(".chk");if(!b)return;const id=b.dataset.line;if(session&&session.id===id){stopSession(true);return}startPattern(id)});
+
+/* ---------- Free singing ---------- */
+const free={segs:[]};
+function resetFree(){free.segs=[];$("fsNotes").textContent="0";$("fsIn").textContent="–";$("fsTune").textContent="–";$("fsOff").textContent="0";$("fsStrip").innerHTML='<span class="hint">Your notes appear here as you sing.</span>';$("fsWrong").hidden=true}
+function onFreeSeg(seg){
+  free.segs.push(seg);const r=state.raga,tol=tolerance(),inR=r.allowed.has(seg.semi);
+  const strip=$("fsStrip");if(free.segs.length===1)strip.innerHTML="";
+  const sp=document.createElement("span");sp.className="t"+(seg.oct<0?" lo":seg.oct>0?" hi":"")+(!inR?" bad":Math.abs(seg.dev)>tol?" off":"");
+  sp.textContent=inR?syl(r.codeBySemi[seg.semi]):GENERIC[seg.semi];strip.appendChild(sp);while(strip.children.length>48)strip.removeChild(strip.firstChild);
+  const n=free.segs.length,inC=free.segs.filter(x=>r.allowed.has(x.semi));
+  $("fsNotes").textContent=n;$("fsIn").textContent=Math.round(inC.length/n*100)+"%";
+  if(inC.length){const m=inC.reduce((a,b)=>a+b.dev,0)/inC.length;$("fsTune").textContent=(m>0?"+":"")+Math.round(m)+"¢"}
+  $("fsOff").textContent=inC.filter(x=>Math.abs(x.dev)>tol).length;
+}
+function freeSummary(){
+  const r=state.raga,tol=tolerance(),el=$("fsWrong");$("freeBtn").textContent="Sing";$("freeCard").classList.remove("active");
+  if(!free.segs.length){el.innerHTML='<span class="hint">No steady notes heard. Sing a little louder or closer to the phone.</span>';el.hidden=false;return}
+  const bad={},offs={};
+  free.segs.forEach(x=>{if(!r.allowed.has(x.semi))bad[x.semi]=(bad[x.semi]||0)+1;else if(Math.abs(x.dev)>tol){const o=offs[x.semi]=offs[x.semi]||{n:0,sum:0};o.n++;o.sum+=x.dev}});
+  const items=[];
+  Object.entries(bad).sort((a,b)=>b[1]-a[1]).forEach(([s,c])=>items.push(`<b>${GENERIC[s]}</b> is not in ${r.name}. You sang it ${c} time${c>1?"s":""}`));
+  Object.entries(offs).sort((a,b)=>b[1].n-a[1].n).forEach(([s,o])=>{const m=o.sum/o.n;items.push(`${fullName(r.codeBySemi[s])} goes <b>${m>0?"sharp":"flat"}</b>, about ${Math.abs(Math.round(m))}¢ (${o.n} time${o.n>1?"s":""})`)});
+  el.innerHTML=items.length?`<span class="score mid">What to fix</span><ul>${items.map(x=>`<li>${x}</li>`).join("")}</ul>`:`<span class="score good">Every swara stayed inside ${r.name} and in shruti</span>`;el.hidden=false;
+}
+$("freeBtn").onclick=async()=>{
+  if(session&&session.type==="free"){stopSession(true);return}
+  stopSession(false);resetFree();const s={type:"free"};session=s;
+  const ok=await startLive(onFreeSeg,monFrame);
+  if(session!==s){if(live)live.stop();return}
+  if(ok){$("freeBtn").textContent="Stop";$("freeCard").classList.add("active");showMonitor(true);monFrame(null);$("monNext").textContent=state.raga.name}
+  else{session=null;$("fsWrong").innerHTML='<span class="hint">Use Upload to check a recording instead.</span>';$("fsWrong").hidden=false}
+};
+$("freeFile").onchange=async e=>{const f=e.target.files[0];if(!f)return;stopSession(false);resetFree();$("fsWrong").innerHTML='<span class="hint">Listening to your recording…</span>';$("fsWrong").hidden=false;
+  try{await analyseFile(f,onFreeSeg);freeSummary()}catch(err){$("fsWrong").innerHTML='<span class="hint">Couldn\'t read that file. Try MP3, M4A or WAV.</span>'}e.target.value=""};
+
+/* ---------- Find my Sa ---------- */
+$("findSa").onclick=async()=>{
+  const b=$("findSa");stopSession(false);const stream=await getMic();if(!stream)return;
+  const c=getCtx(),src=c.createMediaStreamSource(stream),an=c.createAnalyser();an.fftSize=2048;src.connect(an);
+  const buf=new Float32Array(2048),fs=[];b.textContent="Hold your Sa…";b.disabled=true;const t0=performance.now();
+  await new Promise(res=>{const it=setInterval(()=>{an.getFloatTimeDomainData(buf);const f=yin(buf,c.sampleRate);if(f)fs.push(f);if(performance.now()-t0>3500){clearInterval(it);res()}},40)});
+  src.disconnect();stream.getTracks().forEach(t=>t.stop());b.disabled=false;
+  if(fs.length<20){b.textContent="Didn't catch it. Try again";setTimeout(()=>b.textContent="Find my Sa",2500);return}
+  const f=median(fs.slice(Math.floor(fs.length*.2)));const semi=((Math.round(12*Math.log2(f/130.8128))%12)+12)%12;
+  setShruti(semi,true);b.textContent=`Set to ${SHRUTI[semi][0]} · ${SHRUTI[semi][1]} kattai`;setTimeout(()=>b.textContent="Find my Sa",3500);
+};
+
+/* ---------- Tabs ---------- */
+const TABS=["patterns","alapana","free"];
+TABS.forEach(t=>{$("tab-"+t).onclick=()=>{TABS.forEach(x=>{$("tab-"+x).setAttribute("aria-selected",x===t);$("panel-"+x).hidden=x!==t})}});
+
+fillControls();renderAll();
+})();
+</script>
+
+</body></html>
