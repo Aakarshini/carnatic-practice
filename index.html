@@ -619,75 +619,121 @@ $("tanBtn").onclick=()=>tan.on?tan.stop():tan.start();
 $("tanVol").oninput=e=>{if(tan.gain)tan.gain.gain.setTargetAtTime(+e.target.value,ctx.currentTime,.05)};
 $("tanFirst").onchange=()=>{if(tan.on)tan.restart()};
 
-/* ---------- Play a line (voice-like akaaram with glides) ---------- */
-const player={id:null,nodes:null,timers:[],
+/* ---------- Play a line on grand piano ---------- */
+const player={id:null,timers:[],srcs:[],master:null,
   freq(n){return state.sa*Math.pow(2,(TARGET[keySemi(n.k)]+1200*keyOct(n.k))/1200)},
-  stop(){this.timers.forEach(clearTimeout);this.timers=[];
-    if(this.nodes){const {g,oscs}=this.nodes,t=ctx.currentTime;g.gain.cancelScheduledValues(t);g.gain.setTargetAtTime(0,t,.04);oscs.forEach(o=>{try{o.stop(t+.3)}catch(e){}});this.nodes=null}
+  out(){
+    // master bus with a small hall so the piano has a room around it
+    if(this.master)return this.master;const c=getCtx();
+    const m=c.createGain();m.gain.value=.9;const dry=c.createGain();dry.gain.value=1;const wet=c.createGain();wet.gain.value=.22;
+    const cv=c.createConvolver();const L=Math.floor(c.sampleRate*1.8),ir=c.createBuffer(2,L,c.sampleRate);
+    for(let ch=0;ch<2;ch++){const d=ir.getChannelData(ch);let r=99+ch;for(let i=0;i<L;i++){r=(r*16807)%2147483647;d[i]=(r/1073741823-1)*Math.pow(1-i/L,3)*.5}}
+    cv.buffer=ir;m.connect(dry);m.connect(cv);cv.connect(wet);dry.connect(c.destination);wet.connect(c.destination);
+    this.master=m;return m;
+  },
+  stop(){this.timers.forEach(clearTimeout);this.timers=[];const t=ctx?ctx.currentTime:0;
+    this.srcs.forEach(({s,g})=>{try{g.gain.cancelScheduledValues(t);g.gain.setTargetAtTime(0,t,.05);s.stop(t+.4)}catch(e){}});this.srcs=[];
     if(this.id){const el=$(this.id);if(el){el.querySelectorAll(".playing").forEach(x=>x.classList.remove("playing"));const b=el.querySelector(".pl");if(b){b.textContent="Play";b.classList.remove("on")}}}
     this.id=null},
   play(id){
     stopSession(true);this.stop();
-    const c=getCtx(),L=lines.get(id),el=$(id),unit=+$("tempoSel").value;this.id=id;
+    const c=getCtx(),L=lines.get(id),el=$(id),unit=+$("tempoSel").value,out=this.out();this.id=id;
     const b=el.querySelector(".pl");b.textContent="Stop";b.classList.add("on");
-    const g=c.createGain();g.gain.value=0;
-    const lp=c.createBiquadFilter();lp.type="lowpass";lp.frequency.value=2600;
-    const f1=c.createBiquadFilter();f1.type="peaking";f1.frequency.value=800;f1.Q.value=1.4;f1.gain.value=9;
-    const f2=c.createBiquadFilter();f2.type="peaking";f2.frequency.value=1200;f2.Q.value=1.8;f2.gain.value=6;
-    const saw=c.createOscillator();saw.type="sawtooth";const sine=c.createOscillator();sine.type="sine";
-    const sg=c.createGain();sg.gain.value=.22;const ng=c.createGain();ng.gain.value=.55;
-    const lfo=c.createOscillator();lfo.frequency.value=5.2;const lg=c.createGain();lg.gain.value=7;lfo.connect(lg);lg.connect(saw.detune);lg.connect(sine.detune);
-    saw.connect(sg);sine.connect(ng);sg.connect(f1);f1.connect(f2);f2.connect(lp);ng.connect(lp);lp.connect(g);g.connect(c.destination);
-    let t=c.currentTime+.12;const t0=t;
-    L.flat.forEach((n,p)=>{
-      const d=unit*(n.dur||1)*(n.fast?.55:1),f=this.freq(n);
-      if(p===0){saw.frequency.setValueAtTime(f,t);sine.frequency.setValueAtTime(f,t);g.gain.setTargetAtTime(.42,t,.03)}
-      else{const prev=L.flat[p-1];
-        if(prev.k===n.k){g.gain.setTargetAtTime(.06,t-.07,.015);g.gain.setTargetAtTime(.42,t,.02)}
-        saw.frequency.setTargetAtTime(f,t-.02,.028);sine.frequency.setTargetAtTime(f,t-.02,.028)}
-      const at=(t-c.currentTime)*1000;
-      this.timers.push(setTimeout(()=>{el.querySelectorAll(".playing").forEach(x=>x.classList.remove("playing"));const tl=el.querySelector(`.t[data-p="${p}"]`);if(tl)tl.classList.add("playing")},at));
-      t+=d;
-    });
-    g.gain.setTargetAtTime(0,t-.05,.08);
-    [saw,sine,lfo].forEach(o=>{o.start(t0-.05);o.stop(t+.6)});
-    this.nodes={g,oscs:[saw,sine,lfo]};
-    this.timers.push(setTimeout(()=>{if(this.id===id)this.stop()},(t-c.currentTime)*1000+250));
+    setTimeout(()=>{
+      if(this.id!==id)return;
+      let t=c.currentTime+.08;
+      L.flat.forEach((n,p)=>{
+        const d=unit*(n.dur||1)*(n.fast?.55:1),buf=pianoNote(this.freq(n));
+        const s=c.createBufferSource();s.buffer=buf;const g=c.createGain();g.gain.value=n.fast?.75:1;s.connect(g);g.connect(out);
+        const last=p===L.flat.length-1,off=t+d+(last?1.2:.02);
+        s.start(t);g.gain.setValueAtTime(g.gain.value,off);g.gain.setTargetAtTime(0,off,.09);s.stop(off+.6);this.srcs.push({s,g});
+        this.timers.push(setTimeout(()=>{el.querySelectorAll(".playing").forEach(x=>x.classList.remove("playing"));const tl=el.querySelector(`.t[data-p="${p}"]`);if(tl)tl.classList.add("playing")},(t-c.currentTime)*1000));
+        t+=d;
+      });
+      this.timers.push(setTimeout(()=>{if(this.id===id)this.stop()},(t-c.currentTime)*1000+900));
+    },10);
   }
 };
+/* Grand piano voice: inharmonic partials, a pair of detuned strings per note, two-stage decay, hammer thump. Rendered once per pitch and cached. */
+const pianoCache=new Map();
+function pianoNote(f){
+  const key=Math.round(f*100);if(pianoCache.has(key))return pianoCache.get(key);
+  const c=getCtx(),sr=c.sampleRate,dur=2.8,ns=Math.floor(dur*sr),out=new Float32Array(ns);
+  const B=0.00032*Math.pow(f/261.6,.6),N=Math.min(26,Math.floor(9000/f)),tau=2.6*Math.pow(261.6/f,.35),BL=128;
+  for(let n=1;n<=N;n++){
+    const amp=(1/Math.pow(n,1.05))*(0.45+0.55*Math.abs(Math.sin(Math.PI*n/7.3)))*Math.exp(-n*.07);
+    const tn=tau/(1+0.25*(n-1));
+    for(const [det,sa] of [[-0.8,.5],[0.9,.5]]){
+      const fn=f*n*Math.sqrt(1+B*n*n)*Math.pow(2,det/1200);if(fn>sr/2.3)continue;
+      const w=2*Math.PI*fn/sr,cw=Math.cos(w),sw=Math.sin(w);let x=1,y=0,a0=0;
+      for(let b=0;b<ns;b+=BL){
+        const t=b/sr,env=(0.62*Math.exp(-t/(tn*.22))+0.38*Math.exp(-t/tn))*(1-Math.exp(-t/.0012));
+        const a1=amp*sa*env,end=Math.min(BL,ns-b);
+        for(let s=0;s<end;s++){const nx=x*cw-y*sw;y=x*sw+y*cw;x=nx;out[b+s]+=(a0+(a1-a0)*s/end)*y}
+        const m=1/Math.sqrt(x*x+y*y);x*=m;y*=m;a0=a1;
+      }
+    }
+  }
+  // hammer thump
+  let r=7,lp=0;for(let i=0;i<Math.floor(sr*.02);i++){r=(r*16807)%2147483647;lp+=((r/1073741823-1)-lp)*.25;out[i]+=lp*.12*Math.exp(-i/(sr*.004))}
+  let pk=0;for(let i=0;i<ns;i++)pk=Math.max(pk,Math.abs(out[i]));
+  const buf=c.createBuffer(1,ns,sr),d=buf.getChannelData(0);for(let i=0;i<ns;i++)d[i]=out[i]/pk*.55;
+  pianoCache.set(key,buf);return buf;
+}
 
-/* ---------- Pitch detection (YIN) ---------- */
+/* ---------- Pitch detection (YIN, limited to the singer's range around Sa) ---------- */
 let yinBuf=new Float32Array(2048);
 function yin(buf,sr){
-  let rms=0;for(let i=0;i<buf.length;i++)rms+=buf[i]*buf[i];rms=Math.sqrt(rms/buf.length);if(rms<0.01)return null;
-  const tMin=Math.floor(sr/1000),tMax=Math.min(Math.floor(sr/70),buf.length>>1),W=buf.length-tMax;
+  let rms=0;for(let i=0;i<buf.length;i++)rms+=buf[i]*buf[i];rms=Math.sqrt(rms/buf.length);if(rms<0.012)return null;
+  const fmin=Math.max(62,state.sa*.36),fmax=Math.min(1200,state.sa*3.3);
+  const tMin=Math.max(2,Math.floor(sr/fmax)),tMax=Math.min(Math.ceil(sr/fmin),buf.length>>1),W=buf.length-tMax;
   if(yinBuf.length<tMax+2)yinBuf=new Float32Array(tMax+2);
   const yb=yinBuf;yb[0]=1;let run=0;
   for(let t=1;t<=tMax;t++){let s=0;for(let i=0;i<W;i++){const d=buf[i]-buf[i+t];s+=d*d}run+=s;yb[t]=run?s*t/run:1}
-  let tau=-1;for(let t=tMin;t<tMax;t++){if(yb[t]<0.15){while(t+1<tMax&&yb[t+1]<yb[t])t++;tau=t;break}}
-  if(tau<1)return null;const a=yb[tau-1],b=yb[tau],c=yb[tau+1],den=a-2*b+c,sh=den?(a-c)/(2*den):0;return sr/(tau+sh);
+  let tau=-1;for(let t=tMin;t<tMax;t++){if(yb[t]<0.12){while(t+1<tMax&&yb[t+1]<yb[t])t++;tau=t;break}}
+  if(tau<0){let bv=1;for(let t=tMin;t<tMax;t++)if(yb[t]<bv){bv=yb[t];tau=t}if(bv>0.22)return null}
+  if(tau<1||tau+1>tMax)return null;
+  const a=yb[tau-1],b=yb[tau],c=yb[tau+1],den=a-2*b+c,sh=den?(a-c)/(2*den):0;return sr/(tau+sh);
 }
 function median(a){const s=a.slice().sort((x,y)=>x-y);return s[s.length>>1]}
-function mapCents(c){
-  let oct=Math.floor(c/1200);const w=c-oct*1200;let best=0,bd=1e9;
-  for(let i=0;i<=12;i++){const T=i<12?TARGET[i]:1200,d=Math.abs(w-T);if(d<bd){bd=d;best=i}}
-  const T=best<12?TARGET[best]:1200;let semi=best;if(best===12){semi=0;oct++}
-  return{semi,oct,dev:w-T,k:semi+12*oct};
+const tAbs=(semi,oct)=>oct*1200+(semi<12?TARGET[semi]:1200);
+function mapRaga(c){
+  // snap to the raga's own swaras unless the voice clearly sits on a swara outside the raga
+  const r=state.raga;let oct=Math.floor(c/1200);const w=c-oct*1200;
+  let iA=0,dA=1e9,iX=0,dX=1e9;
+  for(let i=0;i<=12;i++){const T=i<12?TARGET[i]:1200,d=Math.abs(w-T);if(d<dX){dX=d;iX=i}if(r.allowed.has(i%12)&&d<dA){dA=d;iA=i}}
+  let pick=(!r.allowed.has(iX%12)&&dX<38&&dA>68)?iX:iA;
+  const T=pick<12?TARGET[pick]:1200;let semi=pick;if(pick===12){semi=0;oct++}
+  return{semi,oct,dev:w-T,k:semi+12*oct,c};
 }
 const tolerance=()=>state.gamaka?45:30;
 class Tracker{
-  constructor(onSeg,onFrame){this.onSeg=onSeg;this.onFrame=onFrame;this.hist=[];this.cur=null;this.stray=0;this.lastV=-1}
-  cfg(){return state.gamaka?{min:.24,grace:5}:{min:.15,grace:2}}
+  // emits a note as soon as it has been steady for ~90 ms, then keeps refining its shruti while it is held
+  constructor(onSeg,onFrame,onUpdate){this.onSeg=onSeg;this.onFrame=onFrame;this.onUpdate=onUpdate||(()=>{});this.hist=[];this.cur=null;this.lastV=-1;this.stray=null;this.fold=0}
+  cfg(){return state.gamaka?{min:.15,grace:.11}:{min:.085,grace:.05}}
   push(t,f){
-    if(!f||f<60||f>1100){if(this.cur&&t-this.lastV>.12)this.close();this.hist=[];this.onFrame(null);return}
-    this.hist.push(1200*Math.log2(f/state.sa));if(this.hist.length>5)this.hist.shift();
-    const n=mapCents(median(this.hist));this.lastV=t;this.onFrame(n);
-    if(!this.cur){this.cur={n,start:t,last:t,devs:[n.dev]};return}
-    if(n.k===this.cur.n.k){this.cur.last=t;this.cur.devs.push(n.dev);this.stray=0;return}
-    if(++this.stray<=this.cfg().grace)return;
-    this.close();this.cur={n,start:t,last:t,devs:[n.dev]};
+    if(!f){if(this.cur&&t-this.lastV>.1)this.close();this.hist=[];this.stray=null;this.onFrame(null);return}
+    let c=1200*Math.log2(f/state.sa);
+    if(this.cur){const d=c-this.cur.n.c;if(Math.abs(Math.abs(d)-1200)<55&&this.fold<8){c-=Math.sign(d)*1200;this.fold++}else this.fold=0}
+    this.hist.push(c);if(this.hist.length>3)this.hist.shift();
+    const cm=median(this.hist);let n=mapRaga(cm);
+    if(this.cur&&n.k!==this.cur.n.k&&state.raga.allowed.has(n.semi)){
+      const Tc=tAbs(this.cur.n.semi,this.cur.n.oct),Tn=tAbs(n.semi,n.oct),mid=(Tc+Tn)/2;
+      if(Tn>Tc?cm<mid+14:cm>mid-14)n={...this.cur.n,dev:cm-Tc,c:cm};
+    }
+    this.lastV=t;this.onFrame(n);
+    if(!this.cur){this.begin(n,t);return}
+    if(n.k===this.cur.n.k){this.stray=null;this.extend(n,t);return}
+    if(!this.stray||this.stray.k!==n.k)this.stray={k:n.k,t,devs:[]};
+    this.stray.devs.push(n.dev);
+    if(t-this.stray.t<this.cfg().grace)return;
+    const st=this.stray;this.close();this.begin(n,st.t);this.cur.devs=st.devs.slice();this.stray=null;
   }
-  close(){const c=this.cur;this.cur=null;this.stray=0;if(c&&c.last-c.start>=this.cfg().min)this.onSeg({k:c.n.k,semi:c.n.semi,oct:c.n.oct,dev:median(c.devs),dur:c.last-c.start})}
+  begin(n,t){this.cur={n,start:t,last:t,devs:[n.dev],seg:null}}
+  extend(n,t){const c=this.cur;c.last=t;c.n.c=n.c;c.devs.push(n.dev);if(c.devs.length>40)c.devs.shift();
+    if(!c.seg&&t-c.start>=this.cfg().min){c.seg={k:c.n.k,semi:c.n.semi,oct:c.n.oct,dev:median(c.devs),dur:t-c.start};this.onSeg(c.seg)}
+    else if(c.seg&&c.devs.length%4===0){c.seg.dev=median(c.devs);c.seg.dur=t-c.start;this.onUpdate(c.seg)}}
+  close(){const c=this.cur;this.cur=null;if(c&&c.seg){c.seg.dev=median(c.devs);c.seg.dur=c.last-c.start;this.onUpdate(c.seg)}}
 }
 
 /* ---------- Microphone (opened once, kept open) ---------- */
@@ -699,21 +745,21 @@ async function getMic(){
   catch(e){micBlocked();return null}
 }
 function micBlocked(){micDenied=true;$("micBanner").hidden=false;$("freeUploadLbl").hidden=false;$("findSa").disabled=true}
-async function startLive(onSeg,onFrame){
+async function startLive(onSeg,onFrame,onUpdate){
   const stream=await getMic();if(!stream)return false;
   const c=getCtx(),src=c.createMediaStreamSource(stream),an=c.createAnalyser();an.fftSize=2048;src.connect(an);
-  const buf=new Float32Array(an.fftSize),tr=new Tracker(onSeg,onFrame);let lastT=0,raf=0;
-  const loop=ts=>{raf=requestAnimationFrame(loop);if(ts-lastT<33)return;lastT=ts;an.getFloatTimeDomainData(buf);tr.push(c.currentTime,yin(buf,c.sampleRate))};
+  const buf=new Float32Array(an.fftSize),tr=new Tracker(onSeg,onFrame,onUpdate);let raf=0,lastT=0;
+  const loop=ts=>{raf=requestAnimationFrame(loop);if(ts-lastT<14)return;lastT=ts;an.getFloatTimeDomainData(buf);tr.push(ts/1000,yin(buf,c.sampleRate))};
   raf=requestAnimationFrame(loop);
   live={stop(){cancelAnimationFrame(raf);tr.close();src.disconnect();live=null}};
   return true;
 }
-async function analyseFile(file,onSeg){
+async function analyseFile(file,onSeg,onUpdate){
   const c=getCtx();const audio=await c.decodeAudioData(await file.arrayBuffer());
   const sr=audio.sampleRate,ch=audio.numberOfChannels,len=audio.length,data=new Float32Array(len);
   for(let k=0;k<ch;k++){const d=audio.getChannelData(k);for(let i=0;i<len;i++)data[i]+=d[i]/ch}
-  const tr=new Tracker(onSeg,()=>{}),hop=Math.round(sr*.03),N=2048;
-  for(let i=0;i+N<len;i+=hop){tr.push(i/sr,yin(data.subarray(i,i+N),sr));if(i%(hop*200)===0)await new Promise(r=>setTimeout(r,0))}
+  const tr=new Tracker(onSeg,()=>{},onUpdate),hop=Math.round(sr*.016),N=2048;
+  for(let i=0,f=0;i+N<len;i+=hop,f++){tr.push(i/sr,yin(data.subarray(i,i+N),sr));if(f%300===0)await new Promise(r=>setTimeout(r,0))}
   tr.close();
 }
 
@@ -789,14 +835,14 @@ async function startPractice(id){
   stopAll();
   const L=lines.get(id),el=$(id);const s={type:"pattern",id,el,E:L.seq,sung:[],attempt:1,complete:false};session=s;
   el.classList.add("active");clearTiles(el);const btn=el.querySelector(".chk");
-  const ok=await startLive(seg=>{if(session===s)onPracticeSeg(s,seg)},monFrame);
+  let evT=0;const ok=await startLive(seg=>{if(session===s)onPracticeSeg(s,seg)},monFrame,()=>{if(session!==s||evT)return;evT=setTimeout(()=>{evT=0;if(session===s&&s.sung.length)evaluate(s,false)},120)});
   if(session!==s){if(live)live.stop();return}
   if(ok){btn.textContent="Stop";showMonitor(true);monFrame(null);evaluate(s,false)}
   else{
     const up=el.querySelector(".upload"),fid="f_"+id;
     up.innerHTML=`<span>Record yourself singing this, then choose the recording.</span><input type="file" accept="audio/*" id="${fid}"><span class="hint" id="${fid}_st"></span>`;up.hidden=false;btn.textContent="Cancel";
     $(fid).onchange=async e=>{const f=e.target.files[0];if(!f)return;$(fid+"_st").textContent="Listening to your recording…";s.sung=[];s.attempt=1;s.complete=false;
-      try{await analyseFile(f,seg=>onPracticeSeg(s,seg));up.hidden=true;evaluate(s,true);endPractice(s)}
+      try{await analyseFile(f,seg=>onPracticeSeg(s,seg),()=>{});up.hidden=true;evaluate(s,true);endPractice(s)}
       catch(err){$(fid+"_st").textContent="Couldn't read that file. Try MP3, M4A or WAV."}};
   }
 }
@@ -818,11 +864,12 @@ document.addEventListener("click",e=>{
 /* ---------- Free singing ---------- */
 const free={segs:[]};
 function resetFree(){free.segs=[];$("fsNotes").textContent="0";$("fsIn").textContent="–";$("fsTune").textContent="–";$("fsOff").textContent="0";$("fsStrip").innerHTML='<span class="hint">Your notes appear here as you sing.</span>';$("fsWrong").hidden=true}
+function updFreeSeg(seg){const sp=seg._el;if(!sp)return;const r=state.raga,inR=r.allowed.has(seg.semi);sp.classList.toggle("off",inR&&Math.abs(seg.dev)>tolerance())}
 function onFreeSeg(seg){
   free.segs.push(seg);const r=state.raga,tol=tolerance(),inR=r.allowed.has(seg.semi);
   const strip=$("fsStrip");if(free.segs.length===1)strip.innerHTML="";
   const sp=document.createElement("span");sp.className="t"+(seg.oct<0?" lo":seg.oct>0?" hi":"")+(!inR?" bad":Math.abs(seg.dev)>tol?" off":"");
-  sp.textContent=inR?syl(r.codeBySemi[seg.semi]):GENERIC[seg.semi];strip.appendChild(sp);while(strip.children.length>48)strip.removeChild(strip.firstChild);
+  sp.textContent=inR?syl(r.codeBySemi[seg.semi]):GENERIC[seg.semi];seg._el=sp;strip.appendChild(sp);while(strip.children.length>48)strip.removeChild(strip.firstChild);
   const n=free.segs.length,inC=free.segs.filter(x=>r.allowed.has(x.semi));
   $("fsNotes").textContent=n;$("fsIn").textContent=Math.round(inC.length/n*100)+"%";
   if(inC.length){const m=inC.reduce((a,b)=>a+b.dev,0)/inC.length;$("fsTune").textContent=(m>0?"+":"")+Math.round(m)+"¢"}
@@ -841,13 +888,13 @@ function freeSummary(){
 $("freeBtn").onclick=async()=>{
   if(session&&session.type==="free"){stopSession(true);return}
   stopAll();resetFree();const s={type:"free"};session=s;
-  const ok=await startLive(seg=>{if(session===s)onFreeSeg(seg)},monFrame);
+  const ok=await startLive(seg=>{if(session===s)onFreeSeg(seg)},monFrame,updFreeSeg);
   if(session!==s){if(live)live.stop();return}
   if(ok){$("freeBtn").textContent="Stop";$("freeCard").classList.add("active");showMonitor(true);monFrame(null);$("monNext").textContent=state.raga.name}
   else{session=null;$("fsWrong").innerHTML='<span class="hint">Use Upload to check a recording instead.</span>';$("fsWrong").hidden=false}
 };
 $("freeFile").onchange=async e=>{const f=e.target.files[0];if(!f)return;stopAll();resetFree();$("fsWrong").innerHTML='<span class="hint">Listening to your recording…</span>';$("fsWrong").hidden=false;
-  try{await analyseFile(f,onFreeSeg);freeSummary()}catch(err){$("fsWrong").innerHTML='<span class="hint">Couldn\'t read that file. Try MP3, M4A or WAV.</span>'}e.target.value=""};
+  try{await analyseFile(f,onFreeSeg,updFreeSeg);freeSummary()}catch(err){$("fsWrong").innerHTML='<span class="hint">Couldn\'t read that file. Try MP3, M4A or WAV.</span>'}e.target.value=""};
 
 /* ---------- Find my Sa ---------- */
 $("findSa").onclick=async()=>{
